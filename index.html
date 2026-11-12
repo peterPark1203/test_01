@@ -1,0 +1,469 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>오늘의 룰렛</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: board-game tabletop — a printed spinner wheel on the left, a control card on the right; stacks to one column on phones */
+:root {
+  --paper: #e9edf5;
+  --surface: #ffffff;
+  --ink: #18203d;
+  --muted: #59648a;
+  --line: #ccd3e4;
+  --accent: #e2462f;
+  --peg: #f4f6fb;
+  --seg1: #e2462f; --seg2: #f2b134; --seg3: #1f8a7a; --seg4: #2f56c8;
+  --seg5: #e5739b; --seg6: #6f9c2c; --seg7: #7a4fc4; --seg8: #f08a3a;
+  --display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #10152b; --surface: #19203d; --ink: #eef1fa; --muted: #9ba5c8;
+    --line: #2d3661; --accent: #ff6a52; --peg: #2a3358;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #10152b; --surface: #19203d; --ink: #eef1fa; --muted: #9ba5c8;
+  --line: #2d3661; --accent: #ff6a52; --peg: #2a3358;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.6;
+  padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px; }
+
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(34px, 6vw, 52px); line-height: 1.05; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.tagline { color: var(--muted); margin: 0; }
+
+.board { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 820px) { .board { grid-template-columns: 1fr; } }
+
+/* wheel */
+.stage { display: grid; gap: 20px; justify-items: center; }
+.wheel-box { position: relative; width: min(100%, 520px); aspect-ratio: 1; max-width: 100%; }
+#wheel { width: 100%; height: 100%; display: block; }
+.pointer { position: absolute; top: -6px; left: 50%; width: 44px; height: 56px; margin-left: -22px; transform-origin: 50% 14px; z-index: 2; filter: drop-shadow(0 3px 0 rgba(0,0,0,.18)); }
+.pointer path { fill: var(--accent); stroke: var(--surface); stroke-width: 3; }
+.pointer circle { fill: var(--surface); }
+.hub {
+  position: absolute; top: 50%; left: 50%; width: 24%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  border-radius: 50%; border: 5px solid var(--surface); background: var(--ink); color: var(--surface);
+  font-family: var(--display); font-size: clamp(16px, 4vw, 24px); cursor: pointer;
+  box-shadow: 0 5px 0 rgba(0,0,0,.22); transition: transform .12s ease, box-shadow .12s ease;
+}
+.hub:hover:not(:disabled) { transform: translate(-50%, -52%); box-shadow: 0 7px 0 rgba(0,0,0,.22); }
+.hub:active:not(:disabled) { transform: translate(-50%, -48%); box-shadow: 0 2px 0 rgba(0,0,0,.22); }
+.hub:disabled { cursor: default; opacity: .9; }
+.hub:focus-visible, button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.result { width: min(100%, 520px); display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: var(--surface); border: 2px solid var(--ink); border-radius: 14px; box-shadow: 0 4px 0 var(--ink); min-height: 86px; }
+.swatch { flex: none; width: 18px; height: 52px; border-radius: 4px; background: var(--line); transition: background .3s; }
+.result-text { min-width: 0; }
+.result-label { font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.result-name { font-family: var(--display); font-size: clamp(24px, 5vw, 34px); line-height: 1.15; overflow-wrap: anywhere; }
+.result.win .result-name { animation: pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* control card */
+.panel { background: var(--surface); border: 2px solid var(--ink); border-radius: 16px; padding: 22px; display: grid; gap: 22px; box-shadow: 0 5px 0 var(--ink); }
+.section { display: grid; gap: 10px; }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+h2 { font-size: 13px; letter-spacing: .08em; margin: 0; font-weight: 700; }
+.count { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; font-size: 13px; font-weight: 500; padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+.chip:hover { border-color: var(--ink); }
+textarea { width: 100%; min-height: 200px; resize: vertical; font: inherit; line-height: 1.7; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+.btn { font: inherit; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; }
+.btn:hover:not(:disabled) { background: var(--paper); }
+.btn.primary { width: 100%; padding: 14px; font-family: var(--display); font-weight: 400; font-size: 22px; background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 4px 0 var(--ink); }
+.btn.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.06); }
+.btn.primary:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.btn:disabled { opacity: .5; cursor: default; }
+kbd { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+
+.history { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 190px; overflow-y: auto; }
+.history li { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; font-size: 14px; }
+.history .dot { width: 10px; height: 10px; border-radius: 50%; }
+.history .name { overflow-wrap: anywhere; }
+.history time { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.empty { font-size: 14px; color: var(--muted); margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { .result.win .result-name { animation: none; } * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>오늘의 <span>룰렛</span></h1>
+    <p class="tagline">고민될 땐 돌려보세요. 항목은 오른쪽에서 바꿀 수 있어요.</p>
+  </header>
+
+  <main class="board">
+    <section class="stage" aria-label="룰렛 판">
+      <div class="wheel-box">
+        <svg class="pointer" id="pointer" viewBox="0 0 44 56" aria-hidden="true">
+          <path d="M22 54 L4 16 A18 18 0 0 1 40 16 Z"></path>
+          <circle cx="22" cy="16" r="6"></circle>
+        </svg>
+        <canvas id="wheel" role="img" aria-label="룰렛 판"></canvas>
+        <button class="hub" id="hub" type="button" aria-label="룰렛 돌리기">돌려!</button>
+      </div>
+      <div class="result" id="result" aria-live="polite">
+        <div class="swatch" id="swatch"></div>
+        <div class="result-text">
+          <div class="result-label" id="resultLabel">결과</div>
+          <div class="result-name" id="resultName">아직 안 돌렸어요</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <button class="btn primary" id="spinBtn" type="button">룰렛 돌리기</button>
+
+      <div class="section">
+        <div class="section-head">
+          <h2>항목</h2>
+          <span class="count" id="count"></span>
+        </div>
+        <div class="chips" id="presets"></div>
+        <textarea id="items" spellcheck="false" aria-label="룰렛 항목, 한 줄에 하나씩"></textarea>
+        <p class="hint">한 줄에 하나씩 적어요. 2개 이상, 최대 24개. <kbd>Space</kbd>로도 돌릴 수 있어요.</p>
+        <div class="row">
+          <button class="btn" id="shuffleBtn" type="button">순서 섞기</button>
+          <label class="toggle"><input type="checkbox" id="removeWin"> 당첨 항목 빼기</label>
+          <label class="toggle"><input type="checkbox" id="sound" checked> 소리</label>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <h2>기록</h2>
+          <button class="chip" id="clearHist" type="button">지우기</button>
+        </div>
+        <ul class="history" id="history"></ul>
+        <p class="empty" id="histEmpty">돌린 결과가 여기에 쌓여요.</p>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+(function () {
+  const TAU = Math.PI * 2;
+  const MAX_ITEMS = 24;
+  const PRESETS = {
+    "점심 메뉴": ["짜장면", "김치찌개", "초밥", "떡볶이", "햄버거", "쌀국수", "제육볶음", "냉면"],
+    "벌칙": ["노래 한 곡", "커피 쏘기", "애교 3초", "팔굽혀펴기 10개", "통과!", "옆 사람 칭찬하기"],
+    "청소 당번": ["민준", "서연", "도윤", "하은", "지호"],
+    "숫자 1–6": ["1", "2", "3", "4", "5", "6"],
+    "예 / 아니오": ["예", "아니오"]
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("wheel"), ctx = canvas.getContext("2d");
+  const ta = $("items"), hub = $("hub"), spinBtn = $("spinBtn");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let items = [], rotation = 0, spinning = false, winner = -1, pendingRemove = null;
+  let history = [], W = 0, audio = null;
+
+  // ---------- storage ----------
+  function save() {
+    try { localStorage.setItem("roulette", JSON.stringify({ text: ta.value, history })); } catch (e) {}
+  }
+  function load() {
+    try { return JSON.parse(localStorage.getItem("roulette") || "null"); } catch (e) { return null; }
+  }
+
+  // ---------- helpers ----------
+  const parse = () => ta.value.split("\n").map((s) => s.trim()).filter(Boolean).slice(0, MAX_ITEMS);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  function segColors() { return [1, 2, 3, 4, 5, 6, 7, 8].map((i) => css("--seg" + i)); }
+  function colorFor(i, n, pal) {
+    let c = i % pal.length;
+    if (n > 1 && i === n - 1 && c === 0) c = 2; // keep last slice from matching the first
+    return pal[c];
+  }
+  function textOn(hex) {
+    const v = parseInt(hex.replace("#", ""), 16);
+    const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 170 ? "#18203d" : "#ffffff";
+  }
+  function indexAt(rot, n) {
+    const a = ((TAU - (rot % TAU)) % TAU + TAU) % TAU;
+    return Math.floor(a / (TAU / n)) % n;
+  }
+  function fit(text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+    return t + "…";
+  }
+
+  // ---------- drawing ----------
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    W = rect.width;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(W * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function draw() {
+    if (!W) return;
+    const ink = css("--ink"), surface = css("--surface"), paper = css("--paper"), peg = css("--peg");
+    const pal = segColors();
+    const c = W / 2, R = c - 2, rim = Math.max(12, W * 0.04), r = R - rim;
+    const n = items.length;
+    ctx.clearRect(0, 0, W, W);
+
+    // outer rim
+    ctx.beginPath(); ctx.arc(c, c, R, 0, TAU); ctx.fillStyle = ink; ctx.fill();
+
+    if (n === 0) {
+      ctx.beginPath(); ctx.arc(c, c, r, 0, TAU); ctx.fillStyle = paper; ctx.fill();
+      ctx.fillStyle = css("--muted"); ctx.font = `500 ${Math.max(14, W * 0.035)}px ${css("--body")}`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("항목을 넣어 주세요", c, c + W * 0.2);
+      return;
+    }
+
+    const seg = TAU / n;
+    const fontSize = Math.max(12, Math.min(W * 0.058, (r * seg) * 0.42, 30));
+    ctx.save();
+    ctx.translate(c, c);
+    ctx.rotate(rotation);
+
+    for (let i = 0; i < n; i++) {
+      const start = -Math.PI / 2 + i * seg;
+      const col = colorFor(i, n, pal);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, start, start + seg); ctx.closePath();
+      ctx.fillStyle = col; ctx.fill();
+      if (winner >= 0 && i !== winner) { ctx.globalAlpha = 0.62; ctx.fillStyle = paper; ctx.fill(); ctx.globalAlpha = 1; }
+      ctx.lineWidth = 2; ctx.strokeStyle = surface; ctx.stroke();
+
+      ctx.save();
+      ctx.rotate(start + seg / 2);
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.font = `400 ${fontSize}px ${css("--display")}`;
+      ctx.fillStyle = (winner >= 0 && i !== winner) ? css("--muted") : textOn(col);
+      ctx.fillText(fit(items[i], r * 0.66), r - Math.max(12, W * 0.03), 0);
+      ctx.restore();
+    }
+
+    // pegs on the rim, one per slice boundary: these are what the pointer clicks against
+    const pr = Math.max(3, rim * 0.28);
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + i * seg;
+      ctx.beginPath(); ctx.arc(Math.cos(a) * (r + rim / 2), Math.sin(a) * (r + rim / 2), pr, 0, TAU);
+      ctx.fillStyle = peg; ctx.fill();
+    }
+    ctx.restore();
+
+    // inner ring behind the hub
+    ctx.beginPath(); ctx.arc(c, c, W * 0.15, 0, TAU); ctx.fillStyle = surface; ctx.fill();
+  }
+
+  // ---------- sound ----------
+  function ensureAudio() {
+    if (!$("sound").checked) return;
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") audio.resume();
+    } catch (e) { audio = null; }
+  }
+  function tone(freq, dur, type, vol, delay) {
+    if (!audio || !$("sound").checked) return;
+    const t = audio.currentTime + (delay || 0);
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  const tick = () => tone(1400, 0.035, "square", 0.05);
+  const fanfare = () => { tone(660, 0.18, "triangle", 0.18); tone(880, 0.18, "triangle", 0.18, 0.12); tone(1320, 0.4, "triangle", 0.18, 0.24); };
+
+  function flickPointer() {
+    const p = $("pointer");
+    if (p.animate && !reduceMotion) p.animate([{ transform: "rotate(-20deg)" }, { transform: "rotate(0deg)" }], { duration: 130, easing: "ease-out" });
+  }
+
+  // ---------- game ----------
+  function setBusy(b) {
+    spinning = b;
+    hub.disabled = spinBtn.disabled = $("shuffleBtn").disabled = b;
+    ta.readOnly = b;
+  }
+
+  function showResult(label, name, color, win) {
+    const box = $("result");
+    $("resultLabel").textContent = label;
+    $("resultName").textContent = name;
+    $("swatch").style.background = color || "var(--line)";
+    box.classList.remove("win");
+    if (win) { void box.offsetWidth; box.classList.add("win"); }
+  }
+
+  function spin() {
+    if (spinning) return;
+    if (pendingRemove !== null) {
+      const lines = ta.value.split("\n");
+      const idx = lines.findIndex((l) => l.trim() === pendingRemove);
+      if (idx >= 0) { lines.splice(idx, 1); ta.value = lines.join("\n"); }
+      pendingRemove = null;
+    }
+    items = parse();
+    winner = -1;
+    updateCount();
+    if (items.length < 2) { draw(); showResult("잠깐!", "항목을 2개 이상 넣어 주세요", null, false); return; }
+
+    ensureAudio();
+    setBusy(true);
+    showResult("돌아가는 중", "두구두구…", null, false);
+
+    const n = items.length, seg = TAU / n;
+    const target = Math.floor(Math.random() * n);
+    const within = 0.12 + Math.random() * 0.76;          // land away from the pegs
+    const desired = (TAU - (target + within) * seg) % TAU;
+    const cur = ((rotation % TAU) + TAU) % TAU;
+    const delta = (desired - cur + TAU) % TAU;
+    const turns = reduceMotion ? 1 : 5 + Math.floor(Math.random() * 3);
+    const from = rotation, to = rotation + turns * TAU + delta;
+    const dur = reduceMotion ? 1200 : 5000 + Math.random() * 1500;
+    let t0 = null, lastPeg = Math.floor(from / seg);
+
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      const p = Math.min(1, (ts - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 4);
+      rotation = from + (to - from) * e;
+      const peg = Math.floor(rotation / seg);
+      if (peg !== lastPeg) { lastPeg = peg; tick(); flickPointer(); }
+      draw();
+      if (p < 1) requestAnimationFrame(frame); else finish();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function finish() {
+    const n = items.length;
+    winner = indexAt(rotation, n);
+    const name = items[winner];
+    const color = colorFor(winner, n, segColors());
+    setBusy(false);
+    draw();
+    showResult("결과", name, color, true);
+    fanfare();
+    history.unshift({ name, color, at: Date.now() });
+    history = history.slice(0, 30);
+    renderHistory();
+    if ($("removeWin").checked) pendingRemove = name;
+    save();
+  }
+
+  // ---------- UI ----------
+  function updateCount() {
+    const n = parse().length;
+    const over = ta.value.split("\n").filter((s) => s.trim()).length > MAX_ITEMS;
+    $("count").textContent = n ? `${n}개 · 각 ${(100 / n).toFixed(1)}%${over ? " · 24개까지만 써요" : ""}` : "0개";
+  }
+
+  function renderHistory() {
+    const ul = $("history");
+    ul.textContent = "";
+    history.forEach((h) => {
+      const li = document.createElement("li");
+      const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = h.color;
+      const nm = document.createElement("span"); nm.className = "name"; nm.textContent = h.name;
+      const tm = document.createElement("time");
+      const d = new Date(h.at);
+      tm.dateTime = d.toISOString();
+      tm.textContent = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+      li.append(dot, nm, tm); ul.append(li);
+    });
+    $("histEmpty").hidden = history.length > 0;
+    $("clearHist").hidden = history.length === 0;
+  }
+
+  function setItems(list) {
+    ta.value = list.join("\n");
+    pendingRemove = null;
+    onEdit();
+  }
+
+  function onEdit() {
+    if (spinning) return;
+    items = parse(); winner = -1;
+    updateCount(); draw(); save();
+  }
+
+  function buildPresets() {
+    const box = $("presets");
+    Object.keys(PRESETS).forEach((k) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = k;
+      b.addEventListener("click", () => { if (!spinning) { setItems(PRESETS[k]); showResult("결과", "아직 안 돌렸어요", null, false); } });
+      box.append(b);
+    });
+  }
+
+  function start(data) {
+    const saved = (data && data.text != null) ? data : load();
+    buildPresets();
+    ta.value = saved && saved.text ? saved.text : PRESETS["점심 메뉴"].join("\n");
+    history = (saved && Array.isArray(saved.history)) ? saved.history : [];
+    if (data && typeof data.rotation === "number") rotation = data.rotation;
+    items = parse();
+    updateCount();
+    renderHistory();
+
+    ta.addEventListener("input", onEdit);
+    hub.addEventListener("click", spin);
+    spinBtn.addEventListener("click", spin);
+    $("shuffleBtn").addEventListener("click", () => {
+      const l = parse();
+      for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; }
+      setItems(l);
+    });
+    $("clearHist").addEventListener("click", () => { history = []; renderHistory(); save(); });
+    document.addEventListener("keydown", (e) => {
+      const tag = (e.target && e.target.tagName) || "";
+      if (e.code === "Space" && !/TEXTAREA|INPUT|BUTTON/.test(tag)) { e.preventDefault(); spin(); }
+    });
+
+    if ("ResizeObserver" in window) new ResizeObserver(resize).observe(canvas);
+    else window.addEventListener("resize", resize);
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", draw);
+    new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    resize();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+  }
+
+  window.claude?.hot?.snapshot?.(() => ({ text: ta.value, history, rotation }));
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
